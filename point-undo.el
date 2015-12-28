@@ -82,7 +82,16 @@
 ;; 2006/02/27: initial version
 
 ;;; Code:
-(eval-when-compile (require 'cl))
+(eval-when-compile (require 'cl-lib))
+
+(defgroup point-undo nil
+  "Group for point-undo"
+  :prefix "point-undo-" :group 'convenience)
+
+(defcustom point-undo-save-interval 1
+  "Save if the cursor stay at a point for a specific time"
+  :group 'point-undo
+  :type 'number)
 
 (defvar point-undo-list nil)
 (make-variable-buffer-local 'point-undo-list)
@@ -90,16 +99,21 @@
 (defvar point-redo-list nil)
 (make-variable-buffer-local 'point-redo-list)
 
-(defun point-undo-pre-command-hook ()
+(defun point-undo-idle-timer-hook ()
   "Save positions before command."
   (unless (or (eq this-command 'point-undo)
               (eq this-command 'point-redo))
-    
     (let ((cell (cons (point) (window-start))))
       (unless (equal cell (car point-undo-list))
-       (setq point-undo-list (cons cell point-undo-list))))
+        (setq point-undo-list (cons cell point-undo-list))))
     (setq point-redo-list nil)))
-(add-hook 'pre-command-hook 'point-undo-pre-command-hook)
+
+(defun point-undo-reset-save-interval (time-in-seconds)
+  (interactive)
+  (cancel-function-timers 'point-undo-idle-timer-hook)
+  (setq point-undo-save-interval time-in-seconds)
+  (run-with-idle-timer point-undo-save-interval t 'point-undo-idle-timer-hook))
+(point-undo-reset-save-interval point-undo-save-interval)
 
 (defun point-undo-doit (list1 list2)
   ;; list1, list2 = {point-undo-list, point-redo-list}
